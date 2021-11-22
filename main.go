@@ -3,15 +3,13 @@ package main
 import (
 	"go-bootcamp/action"
 	"go-bootcamp/data"
-	"go-bootcamp/model"
 	"log"
 	"net/http"
 )
 
 func main() {
-	storage := data.Csv{}
-	dex := model.NewDex(storage.All())
-	info := &action.PokemonInfo{Pokedex: dex}
+	repository := data.Csv{}
+	info := &action.PokemonInfo{Pokedex: repository}
 	http.Handle("/info", info)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))

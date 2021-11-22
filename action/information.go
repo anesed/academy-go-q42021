@@ -3,13 +3,13 @@ package action
 import (
 	"encoding/json"
 	"fmt"
-	"go-bootcamp/model"
+	"go-bootcamp/data"
 	"net/http"
 	"strconv"
 )
 
 type PokemonInfo struct {
-	Pokedex model.Pokedex
+	Pokedex data.Pokedex
 }
 
 func (i *PokemonInfo) ServeHTTP(writer http.ResponseWriter, r *http.Request) {
@@ -30,8 +30,8 @@ func (i *PokemonInfo) ServeHTTP(writer http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	pokemon, found := i.Pokedex.Get(parsedId)
-	if !found {
+	pokemon, err := i.Pokedex.Get(parsedId)
+	if err != nil {
 		writer.WriteHeader(http.StatusNotFound)
 		writer.Write([]byte(fmt.Sprintf(`{"error":"Pokemon with ID %d not found"}`, parsedId)))
 
