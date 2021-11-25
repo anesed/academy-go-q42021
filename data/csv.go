@@ -3,10 +3,11 @@ package data
 import (
 	"encoding/csv"
 	"errors"
-	"go-bootcamp/model"
 	"io"
 	"os"
 	"strconv"
+
+	"go-bootcamp/model"
 )
 
 type Csv struct {
@@ -14,6 +15,7 @@ type Csv struct {
 	initialized bool
 }
 
+// Returns all Pokemon in storage
 func (storage Csv) All() ([]model.Pokemon, error) {
 	err := (&storage).init()
 	data := make([]model.Pokemon, len(storage.index))
@@ -25,6 +27,7 @@ func (storage Csv) All() ([]model.Pokemon, error) {
 	return data, err
 }
 
+// Returns a single Pokemon object by its ID
 func (storage Csv) Get(id int) (model.Pokemon, error) {
 	err := (&storage).init()
 	if err != nil {

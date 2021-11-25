@@ -3,9 +3,10 @@ package action
 import (
 	"encoding/json"
 	"fmt"
-	"go-bootcamp/data"
 	"net/http"
 	"strconv"
+
+	"go-bootcamp/data"
 )
 
 type PokemonInfo struct {

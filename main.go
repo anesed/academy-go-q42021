@@ -1,10 +1,11 @@
 package main
 
 import (
-	"go-bootcamp/action"
-	"go-bootcamp/data"
 	"log"
 	"net/http"
+
+	"go-bootcamp/action"
+	"go-bootcamp/data"
 )
 
 func main() {
