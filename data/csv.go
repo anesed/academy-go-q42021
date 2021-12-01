@@ -10,18 +10,50 @@ import (
 	"go-bootcamp/model"
 )
 
+type fileBridge interface {
+	openReader() (io.ReadCloser, error)
+}
+
 type Csv struct {
 	index       map[int]model.Pokemon
 	initialized bool
+	bridge      fileBridge
+}
+
+type csvFileBridge struct {
+	file string
+}
+
+func (bridge csvFileBridge) openReader() (io.ReadCloser, error) {
+	return os.Open(bridge.file)
+}
+
+// Returns a new fileBridge to be consumed by a Csv
+func NewCsvFileBridge(fileName string) fileBridge {
+	bridge := csvFileBridge{file: fileName}
+
+	return bridge
+}
+
+// Returns a new Csv from the provided file
+func NewCsv(bridge fileBridge) Csv {
+	csv := Csv{bridge: bridge}
+
+	return csv
 }
 
 // Returns all Pokemon in storage
 func (storage Csv) All() ([]model.Pokemon, error) {
 	err := (&storage).init()
+	if err != nil {
+		return []model.Pokemon{}, err
+	}
+
 	data := make([]model.Pokemon, len(storage.index))
+	i := 0
 
 	for _, pokemon := range storage.index {
-		data = append(data, pokemon)
+		data[i] = pokemon
 	}
 
 	return data, err
@@ -47,14 +79,14 @@ func (storage *Csv) init() error {
 
 	if !storage.initialized {
 		err := storage.readFromFile()
-		storage.initialized = err != nil
+		storage.initialized = err == nil
 	}
 
 	return err
 }
 
 func (storage *Csv) readFromFile() error {
-	file, err := os.Open("pokemon.csv")
+	file, err := storage.bridge.openReader()
 	if err != nil {
 		return err
 	}
@@ -74,17 +106,29 @@ func (storage *Csv) readFromFile() error {
 			return err
 		}
 
-		if len(line) != 2 {
-			continue
-		}
-
-		id, err := strconv.Atoi(line[0])
+		pokemon, err := lineToPokemon(line)
 		if err != nil {
 			return err
 		}
-		pokemon := model.Pokemon{ID: id, Name: line[1]}
-		storage.index[id] = pokemon
+
+		storage.index[pokemon.ID] = pokemon
 	}
 
 	return nil
+}
+
+func lineToPokemon(line []string) (model.Pokemon, error) {
+	if len(line) < 2 {
+		return model.Pokemon{}, errors.New("Invalid record line")
+	}
+
+	id, err := strconv.Atoi(line[0])
+
+	if err != nil {
+		return model.Pokemon{}, err
+	}
+
+	pokemon := model.Pokemon{ID: id, Name: line[1]}
+
+	return pokemon, nil
 }

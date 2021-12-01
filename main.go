@@ -9,8 +9,9 @@ import (
 )
 
 func main() {
-	repository := data.Csv{}
+	repository := data.NewCsv(data.NewCsvFileBridge("pokemon.csv"))
 	info := &action.PokemonInfo{Pokedex: repository}
+
 	http.Handle("/info", info)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
