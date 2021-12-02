@@ -34,8 +34,9 @@ func TestCsvGetOne(t *testing.T) {
 
 	record, err := csv.Get(2)
 
-	if err != nil {
+	if err == nil {
 		t.Log("Error expected but none received")
+		t.Fail()
 	}
 }
 
