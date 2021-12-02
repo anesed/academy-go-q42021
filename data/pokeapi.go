@@ -17,11 +17,12 @@ type httpPokeapiBridge struct {
 	baseUrl string
 }
 
+// Creates a new bridge to connect with pokeapi
 func NewHttpPokeapiBridge(client http.Client, baseUrl string) pokeapiBridge {
-	//return httpPokeapiBridge{client: client, baseUrl: "https://pokeapi.co/api/v2"}
 	return httpPokeapiBridge{client: client, baseUrl: baseUrl}
 }
 
+// Returns the habitat of the pokemon with the given ID
 func (bridge httpPokeapiBridge) GetHabitatFor(pokemonId int) (string, error) {
 	speciesUrl, err := bridge.fetchSpeciesUrl(pokemonId)
 
