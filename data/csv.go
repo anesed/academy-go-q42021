@@ -10,18 +10,55 @@ import (
 	"go-bootcamp/model"
 )
 
+type fileBridge interface {
+	openReader() (io.ReadCloser, error)
+	openWriter() (io.WriteCloser, error)
+}
+
 type Csv struct {
 	index       map[int]model.Pokemon
 	initialized bool
+	bridge      fileBridge
+}
+
+type csvFileBridge struct {
+	file string
+}
+
+func (bridge csvFileBridge) openReader() (io.ReadCloser, error) {
+	return os.OpenFile(bridge.file, os.O_RDONLY, 0644)
+}
+
+func (bridge csvFileBridge) openWriter() (io.WriteCloser, error) {
+	return os.OpenFile(bridge.file, os.O_WRONLY, 0644)
+}
+
+// Returns a new fileBridge to be consumed by a Csv
+func NewCsvFileBridge(fileName string) fileBridge {
+	bridge := csvFileBridge{file: fileName}
+
+	return bridge
+}
+
+// Returns a new Csv from the provided file
+func NewCsv(bridge fileBridge) Csv {
+	csv := Csv{bridge: bridge}
+
+	return csv
 }
 
 // Returns all Pokemon in storage
 func (storage Csv) All() ([]model.Pokemon, error) {
 	err := (&storage).init()
+	if err != nil {
+		return []model.Pokemon{}, err
+	}
+
 	data := make([]model.Pokemon, len(storage.index))
+	i := 0
 
 	for _, pokemon := range storage.index {
-		data = append(data, pokemon)
+		data[i] = pokemon
 	}
 
 	return data, err
@@ -42,19 +79,47 @@ func (storage Csv) Get(id int) (model.Pokemon, error) {
 	return record, err
 }
 
+// Saves an updated pokemon to the data store
+func (storage Csv) Update(pokemon model.Pokemon) error {
+	err := (&storage).init()
+	if err != nil {
+		return err
+	}
+
+	storage.index[pokemon.ID] = pokemon
+	contents := make([][]string, len(storage.index))
+	index := 0
+
+	for _, line := range storage.index {
+		contents[index] = pokemonToLine(line)
+		index++
+	}
+
+	file, err := storage.bridge.openWriter()
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+	writer := csv.NewWriter(file)
+	err = writer.WriteAll(contents)
+
+	return err
+}
+
 func (storage *Csv) init() error {
 	var err error = nil
 
 	if !storage.initialized {
 		err := storage.readFromFile()
-		storage.initialized = err != nil
+		storage.initialized = err == nil
 	}
 
 	return err
 }
 
 func (storage *Csv) readFromFile() error {
-	file, err := os.Open("pokemon.csv")
+	file, err := storage.bridge.openReader()
 	if err != nil {
 		return err
 	}
@@ -74,17 +139,33 @@ func (storage *Csv) readFromFile() error {
 			return err
 		}
 
-		if len(line) != 2 {
-			continue
-		}
-
-		id, err := strconv.Atoi(line[0])
+		pokemon, err := lineToPokemon(line)
 		if err != nil {
 			return err
 		}
-		pokemon := model.Pokemon{ID: id, Name: line[1]}
-		storage.index[id] = pokemon
+
+		storage.index[pokemon.ID] = pokemon
 	}
 
 	return nil
+}
+
+func lineToPokemon(line []string) (model.Pokemon, error) {
+	if len(line) < 2 {
+		return model.Pokemon{}, errors.New("Invalid record line")
+	}
+
+	id, err := strconv.Atoi(line[0])
+
+	if err != nil {
+		return model.Pokemon{}, err
+	}
+
+	pokemon := model.Pokemon{ID: id, Name: line[1]}
+
+	return pokemon, nil
+}
+
+func pokemonToLine(pokemon model.Pokemon) []string {
+	return []string{strconv.Itoa(pokemon.ID), pokemon.Name, pokemon.Habitat}
 }
