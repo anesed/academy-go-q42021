@@ -59,6 +59,7 @@ func (storage Csv) All() ([]model.Pokemon, error) {
 
 	for _, pokemon := range storage.index {
 		data[i] = pokemon
+		i++
 	}
 
 	return data, err
@@ -162,6 +163,9 @@ func lineToPokemon(line []string) (model.Pokemon, error) {
 	}
 
 	pokemon := model.Pokemon{ID: id, Name: line[1]}
+	if len(line) > 2 {
+		pokemon.Habitat = line[2]
+	}
 
 	return pokemon, nil
 }
