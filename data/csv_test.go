@@ -40,6 +40,23 @@ func TestCsvGetOne(t *testing.T) {
 	}
 }
 
+func TestCsvUpdate(t *testing.T) {
+	bridge := buildFakeBridge("1,bulbasaur")
+	writer, match := mock.NewFakeWriter()
+	bridge.writer = writer
+	csv := NewCsv(bridge)
+
+	record, _ := csv.Get(1)
+	record.Habitat = "grassland"
+
+	csv.Update(record)
+
+	if !match([]byte("1,bulbasaur,grassland\n")) {
+		t.Log("Written content doesn't match expected bytes")
+		t.Fail()
+	}
+}
+
 func buildFakeBridge(args ...string) fakeBridge {
 	reader := mock.NewFakeReader(strings.Join(args, "\n"))
 	bridge := fakeBridge{reader: reader}
@@ -49,8 +66,13 @@ func buildFakeBridge(args ...string) fakeBridge {
 
 type fakeBridge struct {
 	reader io.ReadCloser
+	writer io.WriteCloser
 }
 
 func (bridge fakeBridge) openReader() (io.ReadCloser, error) {
 	return bridge.reader, nil
+}
+
+func (bridge fakeBridge) openWriter() (io.WriteCloser, error) {
+	return bridge.writer, nil
 }

@@ -43,6 +43,7 @@ func (i *Habitat) ServeHTTP(writer http.ResponseWriter, r *http.Request) {
 		habitat, err := fetchPokemonHabitat(pokemon.ID)
 		if err == nil {
 			pokemon.Habitat = habitat
+			i.Pokedex.Update(pokemon)
 		}
 	}
 

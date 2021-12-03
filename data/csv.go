@@ -12,6 +12,7 @@ import (
 
 type fileBridge interface {
 	openReader() (io.ReadCloser, error)
+	openWriter() (io.WriteCloser, error)
 }
 
 type Csv struct {
@@ -25,7 +26,11 @@ type csvFileBridge struct {
 }
 
 func (bridge csvFileBridge) openReader() (io.ReadCloser, error) {
-	return os.Open(bridge.file)
+	return os.OpenFile(bridge.file, os.O_RDONLY, 0644)
+}
+
+func (bridge csvFileBridge) openWriter() (io.WriteCloser, error) {
+	return os.OpenFile(bridge.file, os.O_WRONLY, 0644)
 }
 
 // Returns a new fileBridge to be consumed by a Csv
@@ -72,6 +77,34 @@ func (storage Csv) Get(id int) (model.Pokemon, error) {
 	}
 
 	return record, err
+}
+
+// Saves an updated pokemon to the data store
+func (storage Csv) Update(pokemon model.Pokemon) error {
+	err := (&storage).init()
+	if err != nil {
+		return err
+	}
+
+	storage.index[pokemon.ID] = pokemon
+	contents := make([][]string, len(storage.index))
+	index := 0
+
+	for _, line := range storage.index {
+		contents[index] = pokemonToLine(line)
+		index++
+	}
+
+	file, err := storage.bridge.openWriter()
+	if err != nil {
+		return err
+	}
+
+	defer file.Close()
+	writer := csv.NewWriter(file)
+	err = writer.WriteAll(contents)
+
+	return err
 }
 
 func (storage *Csv) init() error {
@@ -131,4 +164,8 @@ func lineToPokemon(line []string) (model.Pokemon, error) {
 	pokemon := model.Pokemon{ID: id, Name: line[1]}
 
 	return pokemon, nil
+}
+
+func pokemonToLine(pokemon model.Pokemon) []string {
+	return []string{strconv.Itoa(pokemon.ID), pokemon.Name, pokemon.Habitat}
 }
