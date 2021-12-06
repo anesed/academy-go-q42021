@@ -7,6 +7,7 @@ import (
 	"os"
 	"strconv"
 
+	"go-bootcamp/concurrency"
 	"go-bootcamp/model"
 )
 
@@ -48,19 +49,28 @@ func NewCsv(bridge fileBridge) Csv {
 }
 
 // Returns all Pokemon in storage
-func (storage Csv) All() ([]model.Pokemon, error) {
-	err := (&storage).init()
-	if err != nil {
-		return []model.Pokemon{}, err
+func (storage Csv) All(limit int, criteria string, workers int, itemsPerWorker int) ([]model.Pokemon, error) {
+	r := 1
+	var filter func(model.Pokemon) bool
+	switch criteria {
+	case "even":
+		r = 0
+		fallthrough
+	case "odd":
+		filter = func(p model.Pokemon) bool {
+			return p.ID%2 == r
+		}
+	default:
+		filter = func(model.Pokemon) bool {
+			return true
+		}
 	}
 
-	data := make([]model.Pokemon, len(storage.index))
-	i := 0
-
-	for _, pokemon := range storage.index {
-		data[i] = pokemon
-		i++
-	}
+	data := make([]model.Pokemon, 0)
+	err := storage.readFromFile(limit, func(p model.Pokemon) int {
+		data = append(data, p)
+		return len(data)
+	}, filter, concurrency.NewWorkerPool(workers, itemsPerWorker))
 
 	return data, err
 }
@@ -112,23 +122,39 @@ func (storage *Csv) init() error {
 	var err error = nil
 
 	if !storage.initialized {
-		err := storage.readFromFile()
+		storage.index = make(map[int]model.Pokemon)
+		err := storage.readFromFile(0, func(p model.Pokemon) int {
+			storage.index[p.ID] = p
+			return len(storage.index)
+		}, func(model.Pokemon) bool { return true }, nil)
 		storage.initialized = err == nil
 	}
 
 	return err
 }
 
-func (storage *Csv) readFromFile() error {
+func (storage *Csv) readFromFile(limit int, store func(model.Pokemon) int, filter func(model.Pokemon) bool, wp *concurrency.WorkerPool) error {
 	file, err := storage.bridge.openReader()
 	if err != nil {
 		return err
 	}
 
+	if wp == nil {
+		wp = concurrency.NewWorkerPool(10, 0)
+	}
+	defer wp.Close()
 	defer file.Close()
 
 	reader := csv.NewReader(file)
-	storage.index = make(map[int]model.Pokemon)
+	output := make(chan model.Pokemon)
+
+	go func() {
+		for entry := range output {
+			stored := store(entry)
+			if stored >= limit {
+			}
+		}
+	}()
 
 	for {
 		line, err := reader.Read()
@@ -140,12 +166,14 @@ func (storage *Csv) readFromFile() error {
 			return err
 		}
 
-		pokemon, err := lineToPokemon(line)
-		if err != nil {
-			return err
-		}
-
-		storage.index[pokemon.ID] = pokemon
+		wp.Push(func() bool {
+			pokemon, _ := lineToPokemon(line)
+			if filter(pokemon) {
+				output <- pokemon
+				return true
+			}
+			return false
+		})
 	}
 
 	return nil
