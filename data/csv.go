@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"sync/atomic"
 
 	"go-bootcamp/concurrency"
 	"go-bootcamp/model"
@@ -67,10 +68,9 @@ func (storage Csv) All(limit int, criteria string, workers int, itemsPerWorker i
 	}
 
 	data := make([]model.Pokemon, 0)
-	err := storage.readFromFile(limit, func(p model.Pokemon) int {
+	err := storage.readFromFile(limit, func(p model.Pokemon) {
 		data = append(data, p)
-		return len(data)
-	}, filter, concurrency.NewWorkerPool(workers, itemsPerWorker))
+	}, filter, concurrency.NewWorkerPool(workers, itemsPerWorker, limit))
 
 	return data, err
 }
@@ -123,9 +123,8 @@ func (storage *Csv) init() error {
 
 	if !storage.initialized {
 		storage.index = make(map[int]model.Pokemon)
-		err := storage.readFromFile(0, func(p model.Pokemon) int {
+		err := storage.readFromFile(0, func(p model.Pokemon) {
 			storage.index[p.ID] = p
-			return len(storage.index)
 		}, func(model.Pokemon) bool { return true }, nil)
 		storage.initialized = err == nil
 	}
@@ -133,25 +132,27 @@ func (storage *Csv) init() error {
 	return err
 }
 
-func (storage *Csv) readFromFile(limit int, store func(model.Pokemon) int, filter func(model.Pokemon) bool, wp *concurrency.WorkerPool) error {
+func (storage *Csv) readFromFile(limit int, store func(model.Pokemon), filter func(model.Pokemon) bool, wp *concurrency.WorkerPool) error {
 	file, err := storage.bridge.openReader()
 	if err != nil {
 		return err
 	}
 
 	if wp == nil {
-		wp = concurrency.NewWorkerPool(10, 0)
+		wp = concurrency.NewWorkerPool(10, 0, 0)
 	}
 	defer wp.Close()
 	defer file.Close()
 
 	reader := csv.NewReader(file)
 	output := make(chan model.Pokemon)
+	processed := int64(0)
 
 	go func() {
 		for entry := range output {
-			stored := store(entry)
-			if stored >= limit {
+			if limit == 0 || processed < int64(limit) {
+				store(entry)
+				atomic.AddInt64(&processed, 1)
 			}
 		}
 	}()
@@ -164,6 +165,11 @@ func (storage *Csv) readFromFile(limit int, store func(model.Pokemon) int, filte
 
 		if err != nil {
 			return err
+		}
+
+		if limit > 0 && atomic.LoadInt64(&processed) > int64(limit) {
+			close(output)
+			break
 		}
 
 		wp.Push(func() bool {
