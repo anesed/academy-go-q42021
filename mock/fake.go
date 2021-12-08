@@ -1,7 +1,6 @@
 package mock
 
 import (
-	"bytes"
 	"io"
 	"net/http"
 )
@@ -26,9 +25,9 @@ func NewFakeReader(content string) io.ReadCloser {
 }
 
 // Returns a WriteCloser object that stores what it receives in memory and an Equal function to compare it with []byte
-func NewFakeWriter() (io.WriteCloser, func([]byte) bool) {
+func NewFakeWriter() (io.WriteCloser, func() []byte) {
 	writer := fakeWriter{content: []byte{}}
-	return &writer, (&writer).Equal
+	return &writer, (&writer).GetWrittenBytes
 }
 
 // Returns an http.ResponseWriter object
@@ -68,10 +67,6 @@ func (writer *fakeWriter) Write(payload []byte) (int, error) {
 
 func (writer *fakeWriter) GetWrittenBytes() []byte {
 	return writer.content
-}
-
-func (writer *fakeWriter) Equal(expected []byte) bool {
-	return bytes.Equal(expected, writer.content)
 }
 
 func (writer *fakeWriter) Close() error {

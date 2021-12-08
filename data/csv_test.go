@@ -1,6 +1,7 @@
 package data
 
 import (
+	"bytes"
 	"io"
 	"strings"
 	"testing"
@@ -12,7 +13,7 @@ func TestCsvGetAll(t *testing.T) {
 	bridge := buildFakeBridge("1,bulbasaur", "2,ivysaur", "3,venusaur")
 	csv := NewCsv(bridge)
 
-	records, _ := csv.All()
+	records, _ := csv.All(0, "", 1, 0)
 	expectedCount := 3
 
 	if len(records) != expectedCount {
@@ -42,7 +43,7 @@ func TestCsvGetOne(t *testing.T) {
 
 func TestCsvUpdate(t *testing.T) {
 	bridge := buildFakeBridge("1,bulbasaur")
-	writer, match := mock.NewFakeWriter()
+	writer, getContents := mock.NewFakeWriter()
 	bridge.writer = writer
 	csv := NewCsv(bridge)
 
@@ -50,9 +51,10 @@ func TestCsvUpdate(t *testing.T) {
 	record.Habitat = "grassland"
 
 	csv.Update(record)
+	expected := "1,bulbasaur,grassland\n"
 
-	if !match([]byte("1,bulbasaur,grassland\n")) {
-		t.Log("Written content doesn't match expected bytes")
+	if !bytes.Equal([]byte(expected), getContents()) {
+		t.Logf("Written content `%s`doesn't match expected %s", expected, string(getContents()))
 		t.Fail()
 	}
 }
