@@ -9,6 +9,7 @@ import (
 	"strings"
 )
 
+// Wraps an http.Handler inside a http.HandlerFunc with parameter handling
 func WrapHandler(handler http.Handler) http.HandlerFunc {
 	fields := reflect.ValueOf(handler.(interface{})).Elem()
 	reflectType := reflect.Indirect(fields).Type()
