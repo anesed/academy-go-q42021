@@ -146,13 +146,22 @@ func (storage *Csv) readFromFile(limit int, store func(model.Pokemon), filter fu
 
 	reader := csv.NewReader(file)
 	output := make(chan model.Pokemon)
+	errSink := make(chan error)
 	processed := int64(0)
+	errorCount := int32(0)
 
 	go func() {
-		for entry := range output {
-			if limit == 0 || processed < int64(limit) {
-				store(entry)
-				atomic.AddInt64(&processed, 1)
+		for {
+			select {
+			case entry := <-output:
+				if limit == 0 || processed < int64(limit) {
+					store(entry)
+					atomic.AddInt64(&processed, 1)
+				}
+				break
+			case err = <-errSink:
+				atomic.AddInt32(&errorCount, 1)
+				break
 			}
 		}
 	}()
@@ -167,14 +176,16 @@ func (storage *Csv) readFromFile(limit int, store func(model.Pokemon), filter fu
 			return err
 		}
 
-		if limit > 0 && atomic.LoadInt64(&processed) > int64(limit) {
+		if atomic.LoadInt32(&errorCount) > 0 || (limit > 0 && atomic.LoadInt64(&processed) > int64(limit)) {
 			close(output)
 			break
 		}
 
 		wp.Push(func() bool {
-			pokemon, _ := lineToPokemon(line)
-			if filter(pokemon) {
+			pokemon, e := lineToPokemon(line)
+			if e != nil {
+				errSink <- e
+			} else if filter(pokemon) {
 				output <- pokemon
 				return true
 			}
@@ -182,7 +193,7 @@ func (storage *Csv) readFromFile(limit int, store func(model.Pokemon), filter fu
 		})
 	}
 
-	return nil
+	return err
 }
 
 func lineToPokemon(line []string) (model.Pokemon, error) {

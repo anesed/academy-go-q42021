@@ -41,6 +41,18 @@ func TestCsvGetOne(t *testing.T) {
 	}
 }
 
+func TestCsvErrorInAll(t *testing.T) {
+	bridge := buildFakeBridge("1,bulbasaur", "2", "3,venusaur")
+	csv := NewCsv(bridge)
+
+	_, err := csv.All(0, "", 1, 0)
+
+	if err == nil {
+		t.Log("Error expected but none received")
+		t.Fail()
+	}
+}
+
 func TestCsvUpdate(t *testing.T) {
 	bridge := buildFakeBridge("1,bulbasaur")
 	writer, getContents := mock.NewFakeWriter()
@@ -54,7 +66,7 @@ func TestCsvUpdate(t *testing.T) {
 	expected := "1,bulbasaur,grassland\n"
 
 	if !bytes.Equal([]byte(expected), getContents()) {
-		t.Logf("Written content `%s`doesn't match expected %s", expected, string(getContents()))
+		t.Logf("Written content `%s`doesn't match expected %s", string(getContents()), expected)
 		t.Fail()
 	}
 }
