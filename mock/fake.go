@@ -1,8 +1,8 @@
 package mock
 
 import (
-	"bytes"
 	"io"
+	"net/http"
 )
 
 type fakeReader struct {
@@ -14,15 +14,26 @@ type fakeWriter struct {
 	content []byte
 }
 
+type fakeResponseWriter struct {
+	fakeWriter
+	headers map[string][]string
+}
+
 // Returns a ReadCloser object that reads the given string
 func NewFakeReader(content string) io.ReadCloser {
 	return &fakeReader{content: []byte(content)}
 }
 
 // Returns a WriteCloser object that stores what it receives in memory and an Equal function to compare it with []byte
-func NewFakeWriter() (io.WriteCloser, func([]byte) bool) {
+func NewFakeWriter() (io.WriteCloser, func() []byte) {
 	writer := fakeWriter{content: []byte{}}
-	return &writer, (&writer).Equal
+	return &writer, (&writer).GetWrittenBytes
+}
+
+// Returns an http.ResponseWriter object
+func NewFakeResponseWriter() (http.ResponseWriter, func() []byte) {
+	writer := fakeResponseWriter{fakeWriter: fakeWriter{[]byte{}}, headers: map[string][]string{}}
+	return &writer, (writer).GetWrittenBytes
 }
 
 func (reader *fakeReader) Read(out []byte) (int, error) {
@@ -54,10 +65,18 @@ func (writer *fakeWriter) Write(payload []byte) (int, error) {
 	return len(payload), nil
 }
 
-func (writer *fakeWriter) Equal(expected []byte) bool {
-	return bytes.Equal(expected, writer.content)
+func (writer *fakeWriter) GetWrittenBytes() []byte {
+	return writer.content
 }
 
 func (writer *fakeWriter) Close() error {
 	return nil
+}
+
+func (writer *fakeResponseWriter) Header() http.Header {
+	return writer.headers
+}
+
+func (writer *fakeResponseWriter) WriteHeader(statusCode int) {
+	// Change if headers become important later
 }

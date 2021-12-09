@@ -1,40 +1,23 @@
-package action
+package endpoint
 
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"go-bootcamp/data"
 )
 
 type Habitat struct {
 	Pokedex data.Pokedex
+	ID      int `query:"id,required"`
 }
 
 func (i *Habitat) ServeHTTP(writer http.ResponseWriter, r *http.Request) {
-	writer.Header().Set("Content-Type", "application/json")
-	id, found := r.URL.Query()["id"]
-	if !found {
-		writer.WriteHeader(http.StatusBadRequest)
-		writer.Write([]byte(`{"error":"ID not provided"}`))
-
-		return
-	}
-
-	parsedId, err := strconv.Atoi(id[0])
-	if err != nil {
-		writer.WriteHeader(http.StatusBadRequest)
-		writer.Write([]byte(fmt.Sprintf(`{"error":"Invalid ID: %v"}`, id[0])))
-
-		return
-	}
-
-	pokemon, err := i.Pokedex.Get(parsedId)
+	pokemon, err := i.Pokedex.Get(i.ID)
 	if err != nil {
 		writer.WriteHeader(http.StatusNotFound)
-		writer.Write([]byte(fmt.Sprintf(`{"error":"Pokemon with ID %d not found"}`, parsedId)))
+		writer.Write([]byte(fmt.Sprintf(`{"error":"Pokemon with ID %d not found"}`, i.ID)))
 
 		return
 	}
